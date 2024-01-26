@@ -14,7 +14,7 @@ void add_host(int* array_a, int* array_b, int* array_c, int size)
 __global__ void add_device(int* array_a, int* array_b, int* array_c)
 {
     int index = blockIdx.x * blockDim.x + threadIdx.x;
-    array_c[index] = array_a[index] + array_b[index];
+    array_c[index] += array_a[index] + array_b[index];
 }
 
 int main()
@@ -115,6 +115,77 @@ int main()
     cudaFreeHost(host_a);
     cudaFreeHost(host_b);
     cudaFreeHost(host_c);
+
+    // Mapped memory
+
+    nvtxRangePushA("host_allocation");
+    cudaHostAlloc(&host_a, sizeof(int) * elements, cudaHostAllocMapped);
+    cudaHostAlloc(&host_b, sizeof(int) * elements, cudaHostAllocMapped);
+    cudaHostAlloc(&host_c, sizeof(int) * elements, cudaHostAllocMapped);
+
+    for(int i = 0; i < elements; ++i)
+    {
+        host_a[i] = i;
+        host_b[i] = i;
+    }
+    nvtxRangePop();     
+
+    add_host(host_a, host_b, host_c, elements);
+
+    for(int i = 0; i < 10; ++i)
+    {
+        printf("Host Mapped: %d + %d = %d\n", host_a[i], host_b[i], host_c[i]);
+    }
+    memset(host_c, 0, sizeof(int) * elements);    
+
+    add_device<<<grid, block>>>(host_a, host_b, host_c);
+    cudaDeviceSynchronize();
+
+    for(int i = 0; i < 10; ++i)
+    {
+        printf("Device Mapped: %d + %d = %d\n", host_a[i], host_b[i], host_c[i]);
+    }
+    memset(host_c, 0, sizeof(int) * elements);
+
+    cudaFreeHost(host_a);
+    cudaFreeHost(host_b);
+    cudaFreeHost(host_c);
+
+    // Managed memory
+
+    nvtxRangePushA("host_allocation");
+    cudaMallocManaged(&host_a, sizeof(int) * elements);
+    cudaMallocManaged(&host_b, sizeof(int) * elements);
+    cudaMallocManaged(&host_c, sizeof(int) * elements);
+
+    for(int i = 0; i < elements; ++i)
+    {
+        host_a[i] = i;
+        host_b[i] = i;
+    }
+    nvtxRangePop();     
+
+    add_host(host_a, host_b, host_c, elements);
+
+    for(int i = 0; i < 10; ++i)
+    {
+        printf("Host Managed: %d + %d = %d\n", host_a[i], host_b[i], host_c[i]);
+    }
+    memset(host_c, 0, sizeof(int) * elements);    
+
+    add_device<<<grid, block>>>(host_a, host_b, host_c);
+    cudaDeviceSynchronize();
+
+    for(int i = 0; i < 10; ++i)
+    {
+        printf("Device Managed: %d + %d = %d\n", host_a[i], host_b[i], host_c[i]);
+    }
+    memset(host_c, 0, sizeof(int) * elements);
+
+    cudaFreeHost(host_a);
+    cudaFreeHost(host_b);
+    cudaFreeHost(host_c);
+
 
     return 0;
 }
